@@ -1,10 +1,47 @@
 import time
-
-#Main
+import point_cloud_utils as pcu
 
 def main():
-    print("This program is designed to generate a primitive object in a PLY format\nType 'x!' at any text prompt to end the program.")
-    time.sleep(1)
+    print("This program is designed to generate a mesh from a set of points known as a point cloud")
+    print("This program can also generate primitive objects in a PLY format.")
+    print("Type x! at any prompt to end the program")
+    print("Press 1 to generate a primitive PLY object.")
+    
+    option = ""
+    loopBreak = False
+    while not loopBreak:
+        try:
+            option = input("Press 2 to attempt to perform three operations on a point cloud (Poisson Disk Sampling, Computing normals for point sets, Ball Pivoting Algorithm):")
+            if option == "x!":
+                exit()
+            elif int(option) > 2 or int(option) < 1:
+                print("Invalid Number")
+                loopBreak = False
+            else:
+                option = int(option)
+                loopBreak = True
+        except ValueError:
+            print("Invalid Number") 
+            loopBreak = False
+    
+    if option == 1:
+        createPrimitive()
+    elif option == 2:
+        genMeshFromPointCloud()    
+
+def genMeshFromPointCloud():
+    print("Attempting to create a mesh from a point cloud.")
+    print("Place your point clouds in the folder named 'input' in the directory where this program is located.")
+    print("Your successfully generated mesh will be in a 'output' folder after all processes are complete.")
+    userInput = input("type 'ready' when your files are ready to be converted. Type anything else to exit the program: ")
+    
+    if userInput != "ready":
+        exit()
+
+        
+
+#createPrimitive creates either a primitive of either a cube or a rectangular prism.
+def createPrimitive():
     loopBreak = False
     width = 0
     height = 0
@@ -45,7 +82,7 @@ def main():
                     exit()
                 height = float(height)
             else:
-                depth = wxheight
+                depth = width
             loopBreak = True
 
         except ValueError:
@@ -61,11 +98,11 @@ def main():
             exit()
         loopBreak = True
     
-    write_to_file_cube(comment, depth, width, height, typeOfObject)
+    writeToFileCube(comment, depth, width, height, typeOfObject)
 
 
 
-def write_to_file_cube(comment, depth, width, height, typeOfObject):
+def writeToFileCube(comment, depth, width, height, typeOfObject):
     print("Generating Cube PLY file")
     try:
         f = open( comment + ".ply", "x")

@@ -1,0 +1,21 @@
+#PLY Primitive creator/mesh constructor
+
+This program needs conda to run. 
+use the commands in the following order
+
+##First time setup
+wget https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
+bash Anaconda3-2020.02-Linux-x86_64.sh
+export PATH=~/anaconda3/bin:$PATH
+conda install -c conda-forge point_cloud_utils
+
+##Running the program after installation
+export PATH=~/anaconda3/bin:$PATH
+conda activate base
+python
+>> import point_cloud_utils
+>> exit()
+conda deactivate
+
+conda activate base
+python plymain.py
