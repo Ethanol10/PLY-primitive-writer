@@ -2,6 +2,9 @@ import time
 import numpy as np
 import open3d as o3d
 import trimesh as triM
+from os import listdir
+from os.path import isfile, join
+
 
 def main():
     print("This program is designed to generate a mesh from a set of points known as a point cloud")
@@ -40,23 +43,35 @@ def genMeshFromPointCloud():
     if userInput != "ready":
         exit()  
 
-    pcd = o3d.io.read_point_cloud("./input/sewer_pcl02.ply", format = 'ply')
-    print(pcd)
-    downpcd = pcd.voxel_down_sample(voxel_size=0.001)
-    downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
-    print(downpcd.has_normals())
+    onlyfiles = [f for f in listdir("./input/") if isfile(join("./input/", f))]
 
-    distances = downpcd.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = 3 * avg_dist
-    print("Radius: " + str(radius))
-    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
-    tri_mesh = triM.Trimesh(np.asarray(mesh.vertices), np.asarray(mesh.triangles),
-                          vertex_normals=np.asarray(mesh.vertex_normals))
+    for i in onlyfiles:
+        pcd = o3d.io.read_point_cloud("./input/" + i, format = 'ply')
+        print("working on: " + i)
+        downpcd = pcd.voxel_down_sample(voxel_size=0.001)
+        downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        downpcd.compute_convex_hull()
+        print(downpcd.has_normals())
 
-    triM.convex.is_convex(tri_mesh)
+        distances = downpcd.compute_nearest_neighbor_distance()
+        avg_dist = np.mean(distances)
+        radius = 3 * avg_dist
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
 
-    o3d.io.write_triangle_mesh("./output/sewer_pcl02.ply", mesh)
+        #Retry with poisson disk
+        pcd = mesh.sample_points_poisson_disk(100000)
+        downpcd = pcd.voxel_down_sample(voxel_size=0.001)
+        downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        downpcd.compute_convex_hull()
+        distances = downpcd.compute_nearest_neighbor_distance()
+        avg_dist = np.mean(distances)
+        radius = 3 * avg_dist
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
+
+        #tri_mesh = triM.Trimesh(np.asarray(mesh.vertices), np.asarray(mesh.triangles), vertex_normals=np.asarray(mesh.vertex_normals))
+        #triM.convex.is_convex(tri_mesh)
+        o3d.io.write_triangle_mesh("./output/" + i, mesh)
+
     print("Done, Terminating program.")
     time.sleep(1)
 

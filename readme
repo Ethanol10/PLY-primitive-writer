@@ -1,5 +1,7 @@
 #PLY Primitive creator/mesh constructor
 
+If using the mesh constructor, put your PLY files into the "input" folder.
+
 This program needs conda to run. 
 use the commands in the following order
 
