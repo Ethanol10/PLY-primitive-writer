@@ -8,31 +8,31 @@ from os.path import isfile, join
 
 def main():
     print("This program is designed to generate a mesh from a set of points known as a point cloud")
-    print("This program can also generate primitive objects in a PLY format.")
+    # print("This program can also generate primitive objects in a PLY format.")
     print("Type x! at any prompt to end the program")
-    print("Press 1 to generate a primitive PLY object.")
+    genMeshFromPointCloud()    
+    # print("Press 1 to generate a primitive PLY object.")
     
-    option = ""
-    loopBreak = False
-    while not loopBreak:
-        try:
-            option = input("Press 2 to attempt to perform three operations on a point cloud (Poisson Disk Sampling, Computing normals for point sets, Ball Pivoting Algorithm):")
-            if option == "x!":
-                exit()
-            elif int(option) > 2 or int(option) < 1:
-                print("Invalid Number")
-                loopBreak = False
-            else:
-                option = int(option)
-                loopBreak = True
-        except ValueError:
-            print("Invalid Number") 
-            loopBreak = False
+    # option = ""
+    # loopBreak = False
+    # while not loopBreak:
+    #     try:
+    #         option = input("Press 2 to attempt to perform three operations on a point cloud (Poisson Disk Sampling, Computing normals for point sets, Ball Pivoting Algorithm):")
+    #         if option == "x!":
+    #             exit()
+    #         elif int(option) > 2 or int(option) < 1:
+    #             print("Invalid Number")
+    #             loopBreak = False
+    #         else:
+    #             option = int(option)
+    #             loopBreak = True
+    #     except ValueError:
+    #         print("Invalid Number") 
+    #         loopBreak = False
     
-    if option == 1:
-        createPrimitive()
-    elif option == 2:
-        genMeshFromPointCloud()    
+    # if option == 1:
+    #     createPrimitive()
+    # elif option == 2:
 
 def genMeshFromPointCloud():
     print("Attempting to create a mesh from a point cloud.")
