@@ -1,3 +1,7 @@
 input/
 output/
 *.ply
+*.spec
+dist/
+build/
+node_modules/

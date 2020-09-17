@@ -9,7 +9,8 @@ use the commands in the following order
 wget https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
 bash Anaconda3-2020.02-Linux-x86_64.sh
 export PATH=~/anaconda3/bin:$PATH
-conda install -c conda-forge point_cloud_utils
+conda install -c open3d-admin open3d
+conda install -c anaconda numpy
 
 ##Running the program after installation
 export PATH=~/anaconda3/bin:$PATH

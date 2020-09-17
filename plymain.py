@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import open3d as o3d
-import trimesh as triM
 from os import listdir
 from os.path import isfile, join
 
@@ -68,8 +67,6 @@ def genMeshFromPointCloud():
         radius = 3 * avg_dist
         mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
 
-        #tri_mesh = triM.Trimesh(np.asarray(mesh.vertices), np.asarray(mesh.triangles), vertex_normals=np.asarray(mesh.vertex_normals))
-        #triM.convex.is_convex(tri_mesh)
         o3d.io.write_triangle_mesh("./output/" + i, mesh)
 
     print("Done, Terminating program.")
