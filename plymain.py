@@ -37,6 +37,23 @@ def genMeshFromPointCloud():
     print("Attempting to create a mesh from a point cloud.")
     print("Place your point clouds in the folder named 'input' in the directory where this program is located.")
     print("Your successfully generated mesh will be in a 'output' folder after all processes are complete.")
+    option = ""
+    loopBreak = False
+    while not loopBreak:
+        try:
+            option = input("Type 1 to output all files as PLY. Type 2 to output all files as OBJ: ")
+            if option == "x!":
+                exit()
+            elif int(option) > 2 or int(option) < 1:
+                print("Invalid Number")
+                loopBreak = False
+            else:
+                option = int(option)
+                loopBreak = True
+        except ValueError:
+            print("Invalid Number") 
+            loopBreak = False
+    
     userInput = input("type 'ready' when your files are ready to be converted. Type anything else to exit the program: ")
     
     if userInput != "ready":
@@ -64,10 +81,14 @@ def genMeshFromPointCloud():
         downpcd.compute_convex_hull()
         distances = downpcd.compute_nearest_neighbor_distance()
         avg_dist = np.mean(distances)
-        radius = 3 * avg_dist
+        radius = 3 * avg_dist 
         mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
-
-        o3d.io.write_triangle_mesh("./output/" + i, mesh)
+        if option == 1:
+            outputFileName = i.split(".")
+            o3d.io.write_triangle_mesh("./output/" + outputFileName[0] + ".ply", mesh)
+        elif option == 2:
+            outputFileName = i.split(".")
+            o3d.io.write_triangle_mesh("./output/" + outputFileName[0] + ".obj", mesh)
 
     print("Done, Terminating program.")
     time.sleep(1)

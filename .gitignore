@@ -5,3 +5,4 @@ output/
 dist/
 build/
 node_modules/
+building_env/
