@@ -2,11 +2,11 @@ import time
 import numpy as np
 import open3d as o3d
 import tkinter
+import threading
 from tkinter import * 
 from tkinter import messagebox
 from os import listdir
 from os.path import isfile, join
-
 
 def main():
 
@@ -68,7 +68,7 @@ def main():
     #Progress Text
     textLabel = Label(top, text = "Progress")
     textLabel.place(x = 10, y = 310)
-    text = Text(top, state = DISABLED)
+    text = Text(top)
     scroll_y = Scrollbar(top, orient = "vertical", command=text.yview)
     scroll_y.place(x = 613, y = 330, height = 150)
     text.configure(yscrollcommand = scroll_y.set)
