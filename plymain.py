@@ -1,80 +1,107 @@
 import time
 import numpy as np
 import open3d as o3d
+import tkinter
+from tkinter import * 
+from tkinter import messagebox
 from os import listdir
 from os.path import isfile, join
 
 
 def main():
-    print("This program is designed to generate a mesh from a set of points known as a point cloud")
-    # print("This program can also generate primitive objects in a PLY format.")
-    print("Type x! at any prompt to end the program")
-    genMeshFromPointCloud()    
-    # print("Press 1 to generate a primitive PLY object.")
-    
-    # option = ""
-    # loopBreak = False
-    # while not loopBreak:
-    #     try:
-    #         option = input("Press 2 to attempt to perform three operations on a point cloud (Poisson Disk Sampling, Computing normals for point sets, Ball Pivoting Algorithm):")
-    #         if option == "x!":
-    #             exit()
-    #         elif int(option) > 2 or int(option) < 1:
-    #             print("Invalid Number")
-    #             loopBreak = False
-    #         else:
-    #             option = int(option)
-    #             loopBreak = True
-    #     except ValueError:
-    #         print("Invalid Number") 
-    #         loopBreak = False
-    
-    # if option == 1:
-    #     createPrimitive()
-    # elif option == 2:
 
-def genMeshFromPointCloud():
-    print("Attempting to create a mesh from a point cloud.")
-    print("Place your point clouds in the folder named 'input' in the directory where this program is located.")
-    print("Your successfully generated mesh will be in a 'output' folder after all processes are complete.")
-    option = ""
-    loopBreak = False
-    while not loopBreak:
-        try:
-            option = input("Type 1 to output all files as PLY. Type 2 to output all files as OBJ: ")
-            if option == "x!":
-                exit()
-            elif int(option) > 2 or int(option) < 1:
-                print("Invalid Number")
-                loopBreak = False
-            else:
-                option = int(option)
-                loopBreak = True
-        except ValueError:
-            print("Invalid Number") 
-            loopBreak = False
-    
-    userInput = input("type 'ready' when your files are ready to be converted. Type anything else to exit the program: ")
-    
-    if userInput != "ready":
-        exit()  
+    #main frame
+    top = tkinter.Tk()
+    top.title("PLY/OBJ Mesher")
+    top.resizable(width=False, height=False)
+    top.geometry("640x500")
 
-    onlyfiles = [f for f in listdir("./input/") if isfile(join("./input/", f))]
+    #Entry for first text box
+    loadMeshLabel = Label(top, text = "Load Mesh Path:")
+    loadMeshLabel.place(x = 10, y = 10)
+    loadMeshEntry = Entry(top, width = 84)
+    loadMeshEntry.place(x = 120, y = 10)
+
+    #Entry for Second text box
+    outputMeshLabel = Label(top, text = "Ouput Folder Path:")
+    outputMeshLabel.place(x = 10, y = 40)
+    outputMeshEntry = Entry(top, width = 84)
+    outputMeshEntry.place(x = 120, y = 40)
+
+    #Frame for radio buttons for obj/ply options
+    objRadioFrame = LabelFrame(top, text = "PLY/OBJ format")
+    objRadioFrame.place(x = 10, y = 70, width = 620)
+
+    option = IntVar()
+    plyRadio = Radiobutton(objRadioFrame, text = "PLY", variable = option, value = 1)
+    plyRadio.pack(anchor = W)
+    objRadio = Radiobutton(objRadioFrame, text = "OBJ", variable = option, value = 2)
+    objRadio.pack(anchor = W)
+
+    #Button Frames
+    buttonFrame = LabelFrame(top, text = "Actions")
+    buttonFrame.place(x = 10, y = 150, width = 620)
+
+    def generateBtnCallback():
+        if loadMeshEntry.get() == "":
+            messagebox.showwarning( title = "Empty Input error", message = "You need to specify an input")
+            text.insert(INSERT, "\nSpecify an input folder", foreground = "red")
+            return
+        if outputMeshEntry.get() == "":
+            messagebox.showwarning( title = "Empty Ouput error", message = "You need to specify an output")
+            text.insert(INSERT, "\nSpecify an output folder", foreground = "red")
+            return
+        if option == IntVar():
+            messagebox.showwarning( title = "Option Error", message = "You need to specify a format")
+            text.insert(INSERT, "\nSpecify a output format", foreground = "red")
+            return
+
+        genMeshFromPointCloud(loadMeshEntry.get(), outputMeshEntry.get(), option, text)
+
+    chooseInputPathBtn = Button(buttonFrame, text = "Choose Input Folder", width = 17)
+    chooseInputPathBtn.pack( padx = 10, pady = 10, anchor = W )
+    chooseOutputPathBtn = Button(buttonFrame, text = "Choose Ouput Folder", width = 17)
+    chooseOutputPathBtn.pack( padx = 10, pady = 5, anchor = W )
+    generateBtn = Button(buttonFrame, text = "Generate Meshes", width = 17, command = generateBtnCallback)
+    generateBtn.pack( padx = 10, pady = 10, anchor = W)
+
+    #Progress Text
+    textLabel = Label(top, text = "Progress")
+    textLabel.place(x = 10, y = 310)
+    text = Text(top, state = DISABLED)
+    scroll_y = Scrollbar(top, orient = "vertical", command=text.yview)
+    scroll_y.place(x = 613, y = 330, height = 150)
+    text.configure(yscrollcommand = scroll_y.set)
+    text.insert(INSERT, "Ready for operation")
+    text.place(x = 10, y = 330, width = 603, height = 150)
+
+    top.mainloop()
+
+def genMeshFromPointCloud(sourceStr, outputfolderStr, option, text):
+    onlyfiles = [f for f in listdir(sourceStr) if isfile(join(sourceStr, f))]
 
     for i in onlyfiles:
         pcd = o3d.io.read_point_cloud("./input/" + i, format = 'ply')
-        print("working on: " + i)
+        text.insert(INSERT, "\nworking on: " + i)
+        text.insert(INSERT, "\n0% - Starting voxel downsampling of " + i)
         downpcd = pcd.voxel_down_sample(voxel_size=0.001)
+        text.insert(INSERT, "\nEstimating normals of " + i )
         downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        text.insert(INSERT, "\nComputing convex hull" + i)
         downpcd.compute_convex_hull()
-        print(downpcd.has_normals())
+        text.insert(INSERT, "\n20% - Computed convex hull for" + i)
 
+        text.insert(INSERT, "\nComputing nearest neighbour distance for " + i)
         distances = downpcd.compute_nearest_neighbor_distance()
+        text.insert(INSERT, "\n30% - Calculating average distance for" + i)
         avg_dist = np.mean(distances)
+        text.insert(INSERT, "\nCalculating average distance for" + i)
         radius = 3 * avg_dist
+        text.insert(INSERT, "\n50% Performing Ball Pivoting Algorithm for" + i)
         mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
 
         #Retry with poisson disk
+        text.insert(INSERT, "\n70% - Performing Poisson disk sampling on mesh for " + i)
         pcd = mesh.sample_points_poisson_disk(100000)
         downpcd = pcd.voxel_down_sample(voxel_size=0.001)
         downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
@@ -82,15 +109,18 @@ def genMeshFromPointCloud():
         distances = downpcd.compute_nearest_neighbor_distance()
         avg_dist = np.mean(distances)
         radius = 3 * avg_dist 
+        text.insert(INSERT, "\n90% - Performing 2nd pass for BPA on" + i)
         mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
+        #o3d.visualization.draw_geometries([mesh])
         if option == 1:
             outputFileName = i.split(".")
-            o3d.io.write_triangle_mesh("./output/" + outputFileName[0] + ".ply", mesh)
+            o3d.io.write_triangle_mesh(outputfolderStr + outputFileName[0] + ".ply", mesh)
+            text.insert(INSERT, "\n100% - Mesh generated for " + i)
         elif option == 2:
             outputFileName = i.split(".")
-            o3d.io.write_triangle_mesh("./output/" + outputFileName[0] + ".obj", mesh)
-
-    print("Done, Terminating program.")
+            o3d.io.write_triangle_mesh(outputfolderStr + outputFileName[0] + ".obj", mesh)
+            text.insert(INSERT, "\n100% - Mesh generated for " + i)
+    
     time.sleep(1)
 
 
