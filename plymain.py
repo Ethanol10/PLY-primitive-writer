@@ -80,6 +80,7 @@ class GUIThread:
                 return
 
             #startGenerating(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), text)
+            text.insert(INSERT, "\nThis process will take awhile, and as such, the program may seem to freeze but it will still be running in the background. \nPlease be patient.")
             meshGenThread = meshGen(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), text)
             meshGenThread.start()
 
