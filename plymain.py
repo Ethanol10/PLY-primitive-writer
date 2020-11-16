@@ -1,18 +1,26 @@
+import os
+import time
+import inspect
+import math
 import time
 import numpy as np
 import open3d as o3d
 import tkinter
 import threading
+import meshlabxml as mlx
 from tkinter import * 
 from tkinter import messagebox
 from tkinter import filedialog
 from os import listdir
 from os.path import isfile, join
 
+
+THIS_SCRIPTPATH = os.path.dirname(
+    os.path.realpath(inspect.getsourcefile(lambda: 0)))
+
 def main():
     root = Tk()
     app = GUIThread(root)
-    root.mainloop()
 
 class GUIThread:
     def __init__(self, root):
@@ -95,6 +103,7 @@ class GUIThread:
         text.configure(yscrollcommand = scroll_y.set)
         text.insert(INSERT, "Ready for operation")
         text.place(x = 10, y = 330, width = 603, height = 150)
+        root.mainloop()
 
 class meshGen(threading.Thread):
     def __init__(self, sourceStr, outputfolderStr, option, text):
@@ -222,7 +231,29 @@ def genMeshFromPointCloud(sourceStr, outputfolderStr, option, text, filename):
     elif option == 2:
         outputFileName = filename.split(".")
         o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj", mesh)
+        objTexGen(outputFileName[0], outputfolderStr)
         text.insert(INSERT, "\n100% - Mesh generated for " + filename)
+
+def objTexGen(fileOutputName, outputPath):
+    os.chdir(THIS_SCRIPTPATH)
+    #ml_version = '1.3.4BETA'
+    ml_version = '2016.12'
+
+    # Add meshlabserver directory to OS PATH; omit this if it is already in
+    # your PATH
+    #meshlabserver_path = 'C:\\Program Files\\VCG\\MeshLab'
+    #"""
+    if ml_version == '1.3.4BETA':
+        meshlabserver_path = 'C:\Program Files\VCG\MeshLab'
+    elif ml_version == '2016.12':
+        meshlabserver_path = 'C:/Program Files/VCG/MeshLab'
+    #"""
+    os.environ['PATH'] = meshlabserver_path + os.pathsep 
+
+    texGenScript = mlx.FilterScript(file_in=outputPath + "/" + fileOutputName + ".obj", file_out= outputPath + "/" + fileOutputName + ".obj", ml_version=ml_version)
+    mlx.texture.per_triangle(texGenScript, sidedim = 0, textdim = 4096, border = 0.01, method = 0)
+    mlx.transfer.vc2tex(texGenScript, tex_name=fileOutputName + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
+    texGenScript.run_script()
 
 #createPrimitive creates either a primitive of either a cube or a rectangular prism.
 def createPrimitive():
