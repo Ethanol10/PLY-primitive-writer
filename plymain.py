@@ -1,11 +1,9 @@
 import os
 import time
 import inspect
-import math
 import time
 import numpy as np
 import open3d as o3d
-import tkinter
 import threading
 import meshlabxml as mlx
 from tkinter import * 
@@ -20,6 +18,7 @@ THIS_SCRIPTPATH = os.path.dirname(
 
 def main():
     root = Tk()
+    root.iconbitmap('icon.ico')
     app = GUIThread(root)
 
 class GUIThread:
@@ -193,8 +192,9 @@ def startGenerating(sourceStr, outputfolderStr, option, text):
         genMeshFromPointCloud(sourceStr, outputfolderStr, option, text, i)
 
 def genMeshFromPointCloud(sourceStr, outputfolderStr, option, text, filename):
+    start_time = time.time()
     text.insert(INSERT, "\n")
-    pcd = o3d.io.read_point_cloud("./input/" + filename, format = 'ply')
+    pcd = o3d.io.read_point_cloud(sourceStr + "/" + filename, format = 'ply')
     text.insert(INSERT, "\nworking on: " + filename)
     text.insert(INSERT, "\n0% - Starting voxel downsampling of " + filename)
     downpcd = pcd.voxel_down_sample(voxel_size=0.001)
