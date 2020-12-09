@@ -6,22 +6,23 @@ import numpy as np
 import open3d as o3d
 import threading
 import meshlabxml as mlx
+import tooltip as tt
 from tkinter import * 
 from tkinter import messagebox
 from tkinter import filedialog
 from os import listdir
 from os.path import isfile, join
 
-
+precomputedMeshes = []
 THIS_SCRIPTPATH = os.path.dirname(
     os.path.realpath(inspect.getsourcefile(lambda: 0)))
 
 def main():
     root = Tk()
     root.iconbitmap('icon.ico')
-    app = GUIThread(root)
+    app = MainGUIThread(root)
 
-class GUIThread():
+class MainGUIThread():
     def __init__(self, root):
         paddx = 10
         paddy = 10
@@ -43,7 +44,7 @@ class GUIThread():
             filename = filedialog.askdirectory()
             if filename:
                 outputFolder.set(filename)
-
+        
         def generateBtnCallback():
             voxelResult = DoubleVar()
             radiusResult = DoubleVar()
@@ -77,13 +78,56 @@ class GUIThread():
             meshGenThread = meshGen(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), voxelResult, radiusResult, maxnnResult, psamplesResult, text)
             meshGenThread.start()
 
+        #sets the default parameters 
         def setDefaultParam():
             voxelsize.set("0.0001")
             radius.set("0.1")
             maxnn.set("30")
             psamples.set("100000")
         
+        #Clear all mesh results computed before.
+        def clearResults():
+            msgBox = messagebox.askquestion(title="Delete all precomputed meshes", message = "Do you wish to delete all computed meshes? You will not be able to recover these results! (Note this will not delete all meshes from the output folder.)")
+            if msgBox == 'yes':
+                precomputedMeshes = []
+            
+        #Opens another window that handles the meshes that have been generated before.
+        def openResults():
+            window = Toplevel(root)
+            window.title("Precomputed Meshes")
+            window.iconbitmap('icon.ico')
+            def viewMesh(lb):
+                o3d.visualization.draw_geometries([precomputedMeshes[lb.curselection()[0]].getMesh()])            
+        
+            def deleteMesh(lb):
+                precomputedMeshes.remove(precomputedMeshes[lb.curselection()[0]])
+                lb.delete(lb.curselection()[0])
+
+            #Listbox
+            meshListBox = Listbox(window)
+            #add list adding function
+            i = 0
+            for meshOb in precomputedMeshes:
+                meshListBox.insert(i, meshOb.getName())
+
+            meshListBox.pack(side = LEFT, padx = paddx, pady = paddy/4)
+
+            #Button Options  
+            buttonFrame = LabelFrame(window, text = "Mesh Actions")
+            buttonFrame.pack(side = LEFT, padx = paddx, pady = paddy/4)
+            viewButton = Button(buttonFrame, text="View selected mesh", width = 17, command= lambda : viewMesh(meshListBox))
+            viewButton.pack(side = TOP, padx = paddx, pady = paddy/2)
+            deleteButton = Button(buttonFrame, text="Delete Selected mesh", width = 17, command= lambda : deleteMesh(meshListBox))
+            deleteButton.pack(side = TOP, padx = paddx, pady = paddy/2)
+
         setDefaultParam()
+        
+        #MenuBar
+        menubar = Menu(self)
+        optionMenu = Menu(menubar, tearoff = 0)
+        optionMenu.add_command(label = "View precomputed meshes", command = openResults)
+        optionMenu.add_command(label = "Delete all precomputed meshes", command=clearResults)
+        menubar.add_cascade(label = "Options", menu=optionMenu )
 
         #Paths Label Frame
         paths = LabelFrame(self, text = "Path Location")
@@ -130,21 +174,25 @@ class GUIThread():
     
         voxelSizeLabel = Label(labelFrame, text = "Voxel Size:")
         voxelSizeLabel.pack(padx = paddx, pady = paddy/2, anchor =W )
+        tt.CreateToolTip(voxelSizeLabel, "This buckes all points into voxels, \nand gets a singular point for each voxel representing the bucket of points.\nChanging the voxel size controls how simplified the model should be.")
         voxelSizeEntry = Entry(entryFrame, width = 20, textvariable = voxelsize)
         voxelSizeEntry.pack(padx = paddx, pady = paddy/2)
 
         radiusLabel = Label(labelFrame, text = "Radius:")
         radiusLabel.pack(padx = paddx, pady = paddy/2, anchor =W)
+        tt.CreateToolTip(radiusLabel, "Specifies the search radius when estimating normals.\nA larger radius means a broader search will be conducted to estimate the normals.\nHowever, this also means it will take longer to compute.")
         radiusEntry = Entry(entryFrame, width = 20, textvariable = radius)
         radiusEntry.pack(padx = paddx, pady = paddy/2)
 
         maxnnLabel = Label(labelFrame, text = "Max Nearest Neighbours:" )
         maxnnLabel.pack(padx = paddx, pady = paddy/2, anchor =W)
+        tt.CreateToolTip(maxnnLabel, "The upper limit for how many neighbours should be considered when computing normals for each point.\nThis will take up more computational power the higher the value is set.")
         maxnnEntry = Entry(entryFrame, width = 20, textvariable = maxnn)
         maxnnEntry.pack(padx = paddx, pady = paddy/2)
 
         poissonSampleLabel = Label(labelFrame, text = "No. of Poisson Samples: ")
         poissonSampleLabel.pack(padx = paddx, pady = paddy/2, anchor =W)
+        tt.CreateToolTip(poissonSampleLabel, "The number of points to sample out of a mesh.\nEach point that is sampled using this method is made to approximately be spaced evenly from each other.\nThe higher the number, the more detailed the mesh should be, in exchange for slower computational time. ")
         poissonSampleEntry = Entry(entryFrame, width = 20, textvariable= psamples)
         poissonSampleEntry.pack(padx = paddx, pady = paddy/2, anchor =W)
 
@@ -178,6 +226,7 @@ class GUIThread():
         scroll_y.pack(side =LEFT, fill="y", expand =False, pady = paddy)
         outputFrame.pack(padx = paddx, pady = paddy/2, side = LEFT)
 
+        root.config(menu = menubar)
         root.mainloop()
 
 class meshGen(threading.Thread):
@@ -198,9 +247,15 @@ class meshGen(threading.Thread):
         self.text.see("end")
 
 def startGenerating(sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text):
+    threads = []
     onlyfiles = [f for f in listdir(sourceStr) if isfile(join(sourceStr, f))]
     for i in onlyfiles:
-        genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, i)
+        thread = threading.Thread(target=genMeshFromPointCloud, args=[sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, i])
+        threads.append(thread)
+        thread.start()
+        # genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, i)
+    for thread in threads:
+        thread.join()
 
 def genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, inpRad, maxnn, psamples, text, filename):
     start_time = time.time()
@@ -242,17 +297,25 @@ def genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, inpRad, max
     text.insert(INSERT, "\n90% - Performing 2nd pass for BPA on " + filename + " "  + time.ctime()+ "\n")
     text.see("end")
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
-    #o3d.visualization.draw_geometries([mesh])
+    # def showMesh(inpMesh):
+    #     o3d.visualization.draw_geometries([inpMesh])
+    # o3dwindow = threading.Thread(target = showMesh, args= [mesh])
+    # o3dwindow.start()
+
     if option == 1:
         outputFileName = filename.split(".")
         o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply", mesh)
         text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime())
+        meshOb = meshObj(mesh, outputFileName )
+        precomputedMeshes.append(meshOb)
     elif option == 2:
         outputFileName = filename.split(".")
         o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj", mesh)
         objTexGen(outputFileName[0], outputfolderStr, text, filename)
         text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime()+ "\n")
         text.see("end")
+        meshOb = meshObj(mesh, outputFileName)
+        precomputedMeshes.append(meshOb)
 
 def objTexGen(fileOutputName, outputPath, text, filename):
     os.chdir(THIS_SCRIPTPATH)
@@ -269,111 +332,23 @@ def objTexGen(fileOutputName, outputPath, text, filename):
         meshlabserver_path = 'C:/Program Files/VCG/MeshLab'
     #"""
     os.environ['PATH'] = meshlabserver_path + os.pathsep 
-    text.insert(INSERT, "\n95%\ - Generating Texture file for requested OBJ output on " + filename + " "  + time.ctime()+ "\n")
+    text.insert(INSERT, "\n95% - Generating Texture file for requested OBJ output on " + filename + " "  + time.ctime()+ "\n")
     text.see("end")
     texGenScript = mlx.FilterScript(file_in=outputPath + "/" + fileOutputName + ".obj", file_out= outputPath + "/" + fileOutputName + ".obj", ml_version=ml_version)
     mlx.texture.per_triangle(texGenScript, sidedim = 0, textdim = 4096, border = 0.01, method = 1)
     mlx.transfer.vc2tex(texGenScript, tex_name=fileOutputName + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
     texGenScript.run_script()
 
-#createPrimitive creates either a primitive of either a cube or a rectangular prism.
-def createPrimitive():
-    loopBreak = False
-    width = 0
-    height = 0
-    depth = 0
-    typeOfObject = ""
-    #type of object
-    while not loopBreak:
-        try:
-            typeOfObject = input("What object type? 1 for Cube, 2 for Rectanglular Prism: ")
-            if typeOfObject == "x!":
-                exit()
-            elif int(typeOfObject) > 2 or int(typeOfObject) < 1:
-                print("Invalid Number")
-                loopBreak = False
-            else:
-                typeOfObject = int(typeOfObject)
-                loopBreak = True
-        except ValueError: 
-            print("Invalid Number")
-            loopBreak = False
-
-    loopBreak = False
-    #Get Length of cube
-    while not loopBreak: 
-        try:
-            width = input("Width of the sides of the " + ("cube", "rectanglular prism")[typeOfObject == 2] + "?(please enter a number): ")
-            if width == "x!":
-                exit()
-            width = float(width)
-
-            if typeOfObject == 2:
-                depth = input("Depth of the rectangle?: ")
-                if depth == "x!":
-                    exit()
-                depth = float(depth)
-                height = input("Height of the rectangle?: ")
-                if height == "x!":
-                    exit()
-                height = float(height)
-            else:
-                depth = width
-            loopBreak = True
-
-        except ValueError:
-            print("Invalid Number")
-            time.sleep(2)
-            loopBreak = False
-
-    loopBreak = False
-    comment = ""
-    while not loopBreak:
-        comment = input("File Name: ")
-        if comment == "x!":
-            exit()
-        loopBreak = True
+class meshObj():
+    def __init__(self, mesh, name):
+        self.mesh = mesh
+        self.name = name
     
-    writeToFileCube(comment, depth, width, height, typeOfObject)
+    def getMesh(self):
+        return self.mesh
 
-
-
-def writeToFileCube(comment, depth, width, height, typeOfObject):
-    print("Generating Cube PLY file")
-    try:
-        f = open( comment + ".ply", "x")
-    except IOError:
-        print("File already exists! Terminating program.")
-        time.sleep(2)
-        exit()
-    
-    f.write("ply\nformat ascii 1.0\ncomment ")
-    f.write(("Rectangular Prism","Cube")[typeOfObject == 1] + "\n")
-    f.write("element vertex 8\nproperty float x\nproperty float y\nproperty float z\n")
-    f.write("element face 6\nproperty list uint8 int32 vertex_index\n")
-    f.write("end_header\n")
-    print("Writing vertex points")
-    time.sleep(1)
-    #write vertex points
-    x = 0
-    y = 0
-    z = 0
-    while z == 0 or y == 0 or x == 0:
-        f.write((str(width), str(0))[x == 0] + " " + ((str(height), str(width))[typeOfObject == 1], str(0))[y == 0] + " " + ((str(depth), str(width))[typeOfObject == 1], str(0))[z == 0] + "\n")
-        z += 1
-        if z > 1:
-            z = 0
-            y += 1
-            if y > 1:
-                y = 0
-                x += 1
-    
-    f.write( str(width) + " " + (str(height), str(width))[typeOfObject == 1] + " " + (str(depth), str(width))[typeOfObject == 1] + "\n")
-    f.write("4 1 0 2 3\n4 5 4 6 7\n4 1 0 4 5\n4 3 2 6 7\n4 2 0 4 6\n4 3 1 5 7\n")
-    f.close()
-
-    print("Done. Program will now terminate.")
-    time.sleep(1)
+    def getName(self):
+        return self.name
 
 if __name__ == "__main__":
     main()
