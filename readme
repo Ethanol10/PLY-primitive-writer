@@ -1,4 +1,6 @@
-#PLY Primitive creator/mesh constructor
+#Mesh constructor
+MeshLabXML is used and all code is used by this repo is found in the meshlabxml folder.
+The MeshLabXML Repo can be found here: https://github.com/3DLIRIOUS/MeshLabXML/
 
 If using the mesh constructor, put your PLY files into the "input" folder.
 

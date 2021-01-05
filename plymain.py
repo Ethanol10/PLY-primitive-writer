@@ -14,6 +14,7 @@ from os import listdir
 from os.path import isfile, join
 
 precomputedMeshes = []
+currentlyRunning = False
 THIS_SCRIPTPATH = os.path.dirname(
     os.path.realpath(inspect.getsourcefile(lambda: 0)))
 
@@ -30,7 +31,7 @@ class MainGUIThread():
         self = root
         self.title("PLY/OBJ Mesher")
         self.resizable(width = False, height = False)
-        voxelsize = StringVar()
+        holemaxsize = StringVar()
         radius = StringVar()
         maxnn = StringVar()
         psamples = StringVar()
@@ -56,7 +57,7 @@ class MainGUIThread():
             radiusMean(loadMeshEntry.get(), text)
         
         def generateBtnCallback():
-            voxelResult = DoubleVar()
+            holemaxResult = DoubleVar()
             radiusResult = DoubleVar()
             maxnnResult = DoubleVar()
             psamplesResult = DoubleVar()
@@ -74,9 +75,9 @@ class MainGUIThread():
                 text.insert(INSERT, "\nSpecify a output format")
                 return
             try:
-                voxelResult = float(voxelsize.get())
+                holemaxResult = int(holemaxsize.get())
                 radiusResult = float(radius.get())
-                maxnnResult = float(maxnn.get())
+                maxnnResult = int(maxnn.get())
                 psamplesResult = float(psamples.get())
                 psamplesResult = int(psamplesResult)
                 passResult = int(passVar.get())
@@ -88,13 +89,13 @@ class MainGUIThread():
 
             #startGenerating(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), text)
             text.insert(INSERT, "\nThis process will take awhile, and as such, the program may seem to freeze but it will still be running in the background. \nPlease be patient.")
-            meshGenThread = meshGen(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), voxelResult, radiusResult, maxnnResult, psamplesResult, text, passResult, radModResult)
+            meshGenThread = meshGen(loadMeshEntry.get(), outputMeshEntry.get(), option.get(), holemaxResult, radiusResult, maxnnResult, psamplesResult, text, passResult, radModResult)
             meshGenThread.start()
 
         #sets the default parameters 
         def setDefaultParam():
-            voxelsize.set("0.0001")
-            radius.set("20")
+            holemaxsize.set("300")
+            radius.set("0")
             maxnn.set("30")
             psamples.set("100000")
             passVar.set('1')
@@ -187,15 +188,15 @@ class MainGUIThread():
         entryFrame = Frame(parameterLFrame)
         entryFrame.pack(side = LEFT, padx = paddx/2, pady = paddy/2)
     
-        voxelSizeLabel = Label(labelFrame, text = "Voxel Size:")
-        voxelSizeLabel.pack(padx = paddx, pady = paddy/2, anchor =W )
-        tt.CreateToolTip(voxelSizeLabel, "This buckes all points into voxels, \nand gets a singular point for each voxel representing the bucket of points.\nChanging the voxel size controls how simplified the model should be.")
-        voxelSizeEntry = Entry(entryFrame, width = 20, textvariable = voxelsize)
-        voxelSizeEntry.pack(padx = paddx, pady = paddy/2)
+        holemaxLabel = Label(labelFrame, text = "Close Hole Max Size:")
+        holemaxLabel.pack(padx = paddx, pady = paddy/2, anchor =W)
+        tt.CreateToolTip(holemaxLabel, "Specifies how the max size of a hole that should be patched in the mesh.")
+        holemaxEntry = Entry(entryFrame, width = 20, textvariable = holemaxsize)
+        holemaxEntry.pack(padx = paddx, pady = paddy/2)
 
         radiusLabel = Label(labelFrame, text = "Radius:")
         radiusLabel.pack(padx = paddx, pady = paddy/2, anchor =W)
-        tt.CreateToolTip(radiusLabel, "Specifies the search radius when estimating normals.\nA larger radius means a broader search will be conducted to estimate the normals.\nHowever, this also means it will take longer to compute.")
+        tt.CreateToolTip(radiusLabel, "Specifies the search radius when estimating normals.\nA larger radius means a broader search will be conducted to estimate the normals.\nHowever, this also means it will take longer to compute. \nSet to 0 to let MeshLab Auto Guess.")
         radiusEntry = Entry(entryFrame, width = 20, textvariable = radius)
         radiusEntry.pack(padx = paddx, pady = paddy/2)
 
@@ -211,7 +212,7 @@ class MainGUIThread():
         poissonSampleEntry = Entry(entryFrame, width = 20, textvariable= psamples)
         poissonSampleEntry.pack(padx = paddx, pady = paddy/2, anchor =W)
 
-        passLabel = Label(labelFrame,text = "No. of Extra Passes")
+        passLabel = Label(labelFrame,text = "No. of Extra Passes:")
         passLabel.pack(padx = paddx, pady = paddy, anchor =W)
         tt.CreateToolTip(passLabel, "Number of passes the point cloud should undergo when processing. \nEach extra pass increases the computation time.")
         choices = ["0", "1", "2", "3", "4", "5"]
@@ -261,12 +262,12 @@ class MainGUIThread():
         root.mainloop()
 
 class meshGen(threading.Thread):
-    def __init__(self, sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, passNo, radMod):
+    def __init__(self, sourceStr, outputfolderStr, option, holemax, radius, maxnn, psamples, text, passNo, radMod):
         threading.Thread.__init__(self)
         self.sourceStr = sourceStr
         self.outputFolderStr = outputfolderStr
         self.option = option
-        self.voxel = voxel
+        self.holemax = holemax
         self.radius = radius
         self.maxnn = maxnn
         self.text = text
@@ -274,47 +275,96 @@ class meshGen(threading.Thread):
         self.passNo = passNo
         self.radMod = radMod
     def run(self):
-        startGenerating(self.sourceStr, self.outputFolderStr, self.option, self.voxel, self.radius, self.maxnn, self.psamples, self.text, self.passNo, self.radMod)
+        startGenerating(self.sourceStr, self.outputFolderStr, self.option, self.holemax, self.radius, self.maxnn, self.psamples, self.text, self.passNo, self.radMod)
         self.text.insert(INSERT, "\nAll Meshes completely converted." + "\n")
         messagebox.showinfo(title = "Mesh Generation", message = "All meshes generated successfully.")
         self.text.see("end")
 
-def startGenerating(sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, passNo, radMod):
+def startGenerating(sourceStr, outputfolderStr, option, holemax, radius, maxnn, psamples, text, passNo, radMod):
     threads = []
     onlyfiles = [f for f in listdir(sourceStr) if isfile(join(sourceStr, f))]
     for i in onlyfiles:
         # thread = threading.Thread(target=genMeshFromPointCloud, args=[sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, i])
         # threads.append(thread)
         # thread.start()
-        genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, radius, maxnn, psamples, text, i, passNo, radMod)
+        genMeshFromPointCloud(sourceStr, outputfolderStr, option, holemax, radius, maxnn, psamples, text, i, passNo, radMod)
     # for thread in threads:
     #     thread.join()
 
-def genMeshFromPointCloud(sourceStr, outputfolderStr, option, voxel, inpRad, maxnn, psamples, text, filename, passNo, radMod):
-    #PASS THAT MUST OCCUR
-    mesh = genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename)
+def genMeshFromPointCloud(sourceStr, outputfolderStr, option, holemax, inpRad, maxnn, psamples, text, filename, passNo, radMod):
+    #Initial setup for generating meshes
+    os.chdir(THIS_SCRIPTPATH)
+    #ml_version = '1.3.4BETA'
+    ml_version = '2016.12'
+    # Add meshlabserver directory to OS PATH; omit this if it is already in
+    # your PATH
+    #meshlabserver_path = 'C:\\Program Files\\VCG\\MeshLab'
+    #"""
+    if ml_version == '1.3.4BETA':
+        meshlabserver_path = 'C:\Program Files\VCG\MeshLab'
+    elif ml_version == '2016.12':
+        meshlabserver_path = 'C:/Program Files/VCG/MeshLab'
+    #"""
+    os.environ['PATH'] = meshlabserver_path + os.pathsep 
+    outputFileName = filename.split(".")
+    texGenScript = None
+    #start of script
+    if option == 1:
+        texGenScript = mlx.FilterScript(file_in=sourceStr + "/" + outputFileName[0] + ".ply", file_out= outputfolderStr + "/" + outputFileName[0] + ".ply", ml_version=ml_version)
+    if option == 2:
+        texGenScript = mlx.FilterScript(file_in=sourceStr + "/" + outputFileName[0] + ".ply", file_out= outputfolderStr + "/" + outputFileName[0] + ".obj", ml_version = ml_version)
+    #generate normals, get sampling and ball pivot as much as user desires.
+    mlx.normals.point_sets(texGenScript, neighbors=maxnn)
+    mlx.sampling.poisson_disk(texGenScript, sample_num=psamples, subsample=True)
+    mlx.layers.delete(texGenScript, layer_num=None)
+    if passNo == 0:
+        mlx.remesh.ball_pivoting(texGenScript, ball_radius=inpRad, delete_faces=False)
+    else: 
+        mlx.remesh.ball_pivoting(texGenScript, ball_radius=inpRad, delete_faces=False)
 
+    #The subsequent commands are optional if 0 is the input radius.
     modiRad = inpRad
-    if passNo != 0:
+    if passNo != 0 and inpRad != 0:
         #Subsequent passes must reduce inpRad by a user factor.
         modiRad = modiRad / radMod
         for i in range(0, passNo):
-            mesh = genMeshSubsequentPass(voxel, modiRad, maxnn, psamples, text, filename, mesh)
+            mlx.remesh.ball_pivoting(texGenScript, ball_radius=modiRad, delete_faces=False)
+            modiRad = modiRad / radMod
+    mlx.clean.close_holes(texGenScript, hole_max_edge=holemax)
+    mlx.delete.duplicate_faces(texGenScript)
+
+    #PASS THAT MUST OCCUR
+    # mesh = genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename)
+
+    # modiRad = inpRad
+    # if passNo != 0:
+    #     #Subsequent passes must reduce inpRad by a user factor.
+    #     modiRad = modiRad / radMod
+    #     for i in range(0, passNo):
+    #         mesh = genMeshSubsequentPass(voxel, modiRad, maxnn, psamples, text, filename, mesh)
 
     if option == 1:
-        outputFileName = filename.split(".")
-        o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply", mesh)
-        text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime())
-        meshOb = meshObj(mesh, outputFileName)
-        precomputedMeshes.append(meshOb)
+        # outputFileName = filename.split(".")
+        # o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply", mesh)
+        # text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime())
+        # meshOb = meshObj(mesh, outputFileName)
+        # precomputedMeshes.append(meshOb)
+        texGenScript.run_script()
+        mesh = o3d.io.read_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply")
+        precomputedMeshes.append(mesh)
     elif option == 2:
-        outputFileName = filename.split(".")
-        o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj", mesh)
-        objTexGen(outputFileName[0], outputfolderStr, text, filename)
-        text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime()+ "\n")
-        text.see("end")
-        meshOb = meshObj(mesh, outputFileName)
-        precomputedMeshes.append(meshOb)
+        mlx.texture.per_triangle(texGenScript, sidedim = 0, textdim = 4096, border = 0.01, method = 1)
+        mlx.transfer.vc2tex(texGenScript, tex_name=outputFileName[0] + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
+        texGenScript.run_script()
+        mesh = o3d.io.read_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj")
+        precomputedMeshes.append(mesh)
+        # outputFileName = filename.split(".")
+        # o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj", mesh)
+        # objTexGen(outputFileName[0], outputfolderStr, text, filename)
+        # text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime()+ "\n")
+        # text.see("end")
+        # meshOb = meshObj(mesh, outputFileName)
+        # precomputedMeshes.append(meshOb)
 
 def genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename):
     text.insert(INSERT, "\n")
@@ -322,25 +372,24 @@ def genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename):
     text.insert(INSERT, "\nworking on: " + filename)
     downpcd = pcd.voxel_down_sample(voxel_size=voxel)
     downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius= inpRad, max_nn=int(maxnn)))
-    downpcd.compute_convex_hull()
-
+    # downpcd.compute_convex_hull()
     distances = downpcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
     radius = avg_dist
-    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius]))
     return mesh
 
 def genMeshSubsequentPass(voxel, inpRad, maxnn, psamples, text, filename, mesh):
     #Retry with poisson disk
     text.insert(INSERT, "Working on subsequent passes for " + filename)
     pcd = mesh.sample_points_poisson_disk(int(psamples))
+    # messagebox.showwarning(title = "DEBUG", message = "avg_dist: " + str(radius)) 
     downpcd = pcd.voxel_down_sample(voxel_size=voxel)
-    downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=inpRad, max_nn=int(maxnn)))
-    downpcd.compute_convex_hull()
+    downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius= inpRad, max_nn=int(maxnn)))
+    # downpcd.compute_convex_hull()
     distances = downpcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
-    radius = avg_dist 
-    # messagebox.showwarning(title = "DEBUG", message = "avg_dist: " + str(radius)) 
+    radius = avg_dist
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
     return mesh
 
