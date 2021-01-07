@@ -94,7 +94,7 @@ class MainGUIThread():
 
         #sets the default parameters 
         def setDefaultParam():
-            holemaxsize.set("300")
+            holemaxsize.set("30")
             radius.set("0")
             maxnn.set("30")
             psamples.set("100000")
@@ -311,12 +311,12 @@ def genMeshFromPointCloud(sourceStr, outputfolderStr, option, holemax, inpRad, m
     #start of script
     if option == 1:
         texGenScript = mlx.FilterScript(file_in=sourceStr + "/" + outputFileName[0] + ".ply", file_out= outputfolderStr + "/" + outputFileName[0] + ".ply", ml_version=ml_version)
-    if option == 2:
+    elif option == 2:
         texGenScript = mlx.FilterScript(file_in=sourceStr + "/" + outputFileName[0] + ".ply", file_out= outputfolderStr + "/" + outputFileName[0] + ".obj", ml_version = ml_version)
     #generate normals, get sampling and ball pivot as much as user desires.
     mlx.normals.point_sets(texGenScript, neighbors=maxnn)
     mlx.sampling.poisson_disk(texGenScript, sample_num=psamples, subsample=True)
-    mlx.layers.delete(texGenScript, layer_num=None)
+    # mlx.layers.delete(texGenScript, layer_num=None)
     if passNo == 0:
         mlx.remesh.ball_pivoting(texGenScript, ball_radius=inpRad, delete_faces=False)
     else: 
@@ -333,87 +333,23 @@ def genMeshFromPointCloud(sourceStr, outputfolderStr, option, holemax, inpRad, m
     mlx.clean.close_holes(texGenScript, hole_max_edge=holemax)
     mlx.delete.duplicate_faces(texGenScript)
 
-    #PASS THAT MUST OCCUR
-    # mesh = genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename)
-
-    # modiRad = inpRad
-    # if passNo != 0:
-    #     #Subsequent passes must reduce inpRad by a user factor.
-    #     modiRad = modiRad / radMod
-    #     for i in range(0, passNo):
-    #         mesh = genMeshSubsequentPass(voxel, modiRad, maxnn, psamples, text, filename, mesh)
-
     if option == 1:
-        # outputFileName = filename.split(".")
-        # o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply", mesh)
-        # text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime())
-        # meshOb = meshObj(mesh, outputFileName)
-        # precomputedMeshes.append(meshOb)
-        texGenScript.run_script()
+        outputMask = mlx.default_output_mask(outputFileName[0] + ".ply", vert_colors= True, face_colors= True)
+        texGenScript.run_script(output_mask=outputMask)
         mesh = o3d.io.read_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".ply")
-        precomputedMeshes.append(mesh)
+        meshOb = meshObj(mesh, outputFileName)
+        precomputedMeshes.append(meshOb)
     elif option == 2:
-        mlx.texture.per_triangle(texGenScript, sidedim = 0, textdim = 4096, border = 0.01, method = 1)
-        mlx.transfer.vc2tex(texGenScript, tex_name=outputFileName[0] + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
-        texGenScript.run_script()
+        outputMask = mlx.default_output_mask(outputFileName[0] + ".obj", vert_colors= True, face_colors= True)
+        texGenScript.run_script(output_mask=outputMask)
+
+        textureScript = mlx.FilterScript(file_in=outputfolderStr + "/" + outputFileName[0] + ".obj", file_out= outputfolderStr + "/" + outputFileName[0] + ".obj", ml_version = ml_version)
+        mlx.texture.per_triangle(textureScript, sidedim = 0, textdim = 4096, border = 0.01, method = 1)
+        mlx.transfer.vc2tex(textureScript, tex_name=outputFileName[0] + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
+        textureScript.run_script()
         mesh = o3d.io.read_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj")
-        precomputedMeshes.append(mesh)
-        # outputFileName = filename.split(".")
-        # o3d.io.write_triangle_mesh(outputfolderStr + "/" + outputFileName[0] + ".obj", mesh)
-        # objTexGen(outputFileName[0], outputfolderStr, text, filename)
-        # text.insert(INSERT, "\n100% - Mesh generated for " + filename + " "  + time.ctime()+ "\n")
-        # text.see("end")
-        # meshOb = meshObj(mesh, outputFileName)
-        # precomputedMeshes.append(meshOb)
-
-def genMeshPassONE(sourceStr, voxel, inpRad, maxnn, text, filename):
-    text.insert(INSERT, "\n")
-    pcd = o3d.io.read_point_cloud(sourceStr + "/" + filename, format = 'ply')
-    text.insert(INSERT, "\nworking on: " + filename)
-    downpcd = pcd.voxel_down_sample(voxel_size=voxel)
-    downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius= inpRad, max_nn=int(maxnn)))
-    # downpcd.compute_convex_hull()
-    distances = downpcd.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = avg_dist
-    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius]))
-    return mesh
-
-def genMeshSubsequentPass(voxel, inpRad, maxnn, psamples, text, filename, mesh):
-    #Retry with poisson disk
-    text.insert(INSERT, "Working on subsequent passes for " + filename)
-    pcd = mesh.sample_points_poisson_disk(int(psamples))
-    # messagebox.showwarning(title = "DEBUG", message = "avg_dist: " + str(radius)) 
-    downpcd = pcd.voxel_down_sample(voxel_size=voxel)
-    downpcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius= inpRad, max_nn=int(maxnn)))
-    # downpcd.compute_convex_hull()
-    distances = downpcd.compute_nearest_neighbor_distance()
-    avg_dist = np.mean(distances)
-    radius = avg_dist
-    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(downpcd, o3d.utility.DoubleVector([radius, radius * 2]))
-    return mesh
-
-def objTexGen(fileOutputName, outputPath, text, filename):
-    os.chdir(THIS_SCRIPTPATH)
-    #ml_version = '1.3.4BETA'
-    ml_version = '2016.12'
-
-    # Add meshlabserver directory to OS PATH; omit this if it is already in
-    # your PATH
-    #meshlabserver_path = 'C:\\Program Files\\VCG\\MeshLab'
-    #"""
-    if ml_version == '1.3.4BETA':
-        meshlabserver_path = 'C:\Program Files\VCG\MeshLab'
-    elif ml_version == '2016.12':
-        meshlabserver_path = 'C:/Program Files/VCG/MeshLab'
-    #"""
-    os.environ['PATH'] = meshlabserver_path + os.pathsep 
-    text.insert(INSERT, "\nGenerating Texture file for requested OBJ output on " + filename + " "  + time.ctime()+ "\n")
-    text.see("end")
-    texGenScript = mlx.FilterScript(file_in=outputPath + "/" + fileOutputName + ".obj", file_out= outputPath + "/" + fileOutputName + ".obj", ml_version=ml_version)
-    mlx.texture.per_triangle(texGenScript, sidedim = 0, textdim = 4096, border = 0.01, method = 1)
-    mlx.transfer.vc2tex(texGenScript, tex_name=fileOutputName + ".png", tex_width=4096, tex_height=4096, assign_tex=True, fill_tex=True)
-    texGenScript.run_script()
+        meshOb = meshObj(mesh, outputFileName)
+        precomputedMeshes.append(meshOb)
 
 def radiusMean(sourceStr, text):
     onlyfiles = [f for f in listdir(sourceStr) if isfile(join(sourceStr, f))]

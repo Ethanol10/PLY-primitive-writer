@@ -1,6 +1,7 @@
 #Mesh constructor
 MeshLabXML is used and all code is used by this repo is found in the meshlabxml folder.
 The MeshLabXML Repo can be found here: https://github.com/3DLIRIOUS/MeshLabXML/
+You will need MeshLab installed for the program to use meshlabserver.
 
 If using the mesh constructor, put your PLY files into the "input" folder.
 
@@ -13,14 +14,6 @@ bash Anaconda3-2020.02-Linux-x86_64.sh
 export PATH=~/anaconda3/bin:$PATH
 conda install -c open3d-admin open3d
 conda install -c anaconda numpy
-
-##Running the program after installation
-export PATH=~/anaconda3/bin:$PATH
-conda activate base
-python
->> import point_cloud_utils
->> exit()
-conda deactivate
 
 conda activate base
 python plymain.py
